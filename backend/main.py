@@ -123,43 +123,83 @@ Do not guess items that are not clearly visible.
         "ingredients": ingredients
     }
 
+
+def calculate_match(user_ingredients, recipe_ingredients):
+
+    matches = 0
+
+    for ingredient in recipe_ingredients:
+        if ingredient in user_ingredients:
+            matches += 1
+
+    score = matches / len(recipe_ingredients)
+
+    return score
+
 @app.post("/recipes")
 async def find_recipes(data: dict):
 
     ingredients = data.get("ingredients", [])
 
+    ingredients = [
+    ingredient.lower().strip()
+    for ingredient in ingredients
+    ]      
+
     if not ingredients:
         return {"recipes": []}
 
     # For our first test, search using the first ingredient
-    ingredient = ingredients[0]
+    meals = [] 
 
-    response = requests.get(
-        "https://www.themealdb.com/api/json/v1/1/filter.php",
-        params={"i": ingredient}
-    )
+    for ingredient in ingredients:
+        response = requests.get(
+            "https://www.themealdb.com/api/json/v1/1/filter.php",
+            params={"i": ingredient}
+        )
 
-    if response.status_code != 200:
-        return {
-            "recipes": [],
-            "error": "Could not retrieve recipes"
-        }
+        if response.status_code == 200:
+            data = response.json()
+            ingredient_meals = data.get("meals") or []
+            meals.extend(ingredient_meals)
 
-    data = response.json()
-
-    meals = data.get("meals") or []
-
-    # Only return the first 6 recipes
-    meals = meals[:6]
+    unique_meals = {}
+    for meal in meals:
+        unique_meals[meal["idMeal"]] = meal
+    meals = list(unique_meals.values())
+    meals = meals[:20]
 
     recipes = []
 
     for meal in meals:
+        detail_response = requests.get(
+            "https://www.themealdb.com/api/json/v1/1/lookup.php",
+            params={"i": meal["idMeal"]}
+        )
+
+        detail_data = detail_response.json()
+
+        full_meal = detail_data["meals"][0]
+
+        recipe_ingredients = []
+
+        for i in range(1, 21):
+            ingredient = full_meal[f"strIngredient{i}"]
+
+            if ingredient:
+                recipe_ingredients.append(ingredient.lower())
+
+        score = calculate_match(ingredients, recipe_ingredients)
+
         recipes.append({
             "id": meal["idMeal"],
             "name": meal["strMeal"],
-            "image": meal["strMealThumb"]
+            "image": meal["strMealThumb"],
+            "ingredients": recipe_ingredients,
+            "score": score
         })
+
+    recipes.sort(key=lambda recipe: recipe["score"], reverse=True)
 
     return {
         "recipes": recipes

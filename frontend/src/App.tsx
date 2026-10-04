@@ -73,7 +73,7 @@ function App() {
   })
 
   const data = await response.json()
-
+  console.log(data)
   setIngredients(data.ingredients)
   }
 
@@ -89,6 +89,8 @@ async function findRecipes() {
   })
 
   const data = await response.json()
+
+  console.log("RECIPE RESPONSE:", data)
 
   setRecipes(data.recipes)
 }
@@ -235,6 +237,9 @@ async function findRecipes() {
                             />
 
                             <h3>{recipe.name}</h3>
+                            <p className="match-score">
+                              {Math.round(recipe.score * 100)}% ingredient match
+                            </p>
                           </div>
                         ))}
                       </div>
